@@ -76,10 +76,8 @@ class Translater:
             print(f"存在无法翻译字段，记录在{file_name}, 可手动处理")
 
 trans = Translater()
-def translaterC(word):
-    return trans.treanslateC(word)
 
-print(translaterC("SRT-TP网元状态"))
+
 
 
 
