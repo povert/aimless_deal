@@ -6,12 +6,12 @@ import jieba.posseg as psg
 # 名称简化，方便转换为英文变量命名
 
 class SimplifyModel:
-    extract_tag = {'n', 'v', 'vn', 'eng', 'uj', 'j', 'x'}
+    extract_tag = {'n', 'v', 'vn', 'eng', 'uj', 'j', 'x', 'b'}
 
     def __init__(self, noun):
         self.noun = noun
         self.simplify_noun = ''
-        self._psg_list = psg.cut(noun)
+        self._psg_list = list(psg.cut(noun))
         self.simplify()
 
     def simplify(self):
@@ -36,7 +36,7 @@ class SimplifyModel:
     def _match_noun(self):
         format_noun = ''.join([c for (c, _) in self.noun_group])
         format_rule1 = ['n', ]
-        format_rule2 = ['v-n', 'n-n', 'vn']
+        format_rule2 = ['v-n', 'vn-n', 'n-n', 'vn']
         format_rule3 = ['n-n-n', ]
         if format_noun in format_rule1:
             self.simplify_noun = self.noun
@@ -51,5 +51,38 @@ class SimplifyModel:
             rm_extra = re.match(r'.+列表(.+)', self.simplify_noun).group(1)
             self.simplify_noun = re.sub(rm_extra, '', self.simplify_noun)
 
+class AnalyzeModel:
+    def __init__(self, noun):
+        self.noun = noun
+        self.analyze_noun = []
+        self._psg_list = list(psg.cut(noun))
+        self.analyze()
 
+    def analyze(self):
+        self._split_noun()
+        self._add_extra_noun()
+
+    def _split_noun(self):
+        self.split_group = []
+        cur_group = []
+        for (w, c) in self._psg_list:
+            if c != 'n' and not cur_group:
+                self.split_group.append(['p', w])
+            elif w in {'和', '与', '、'} or c == 'c':
+                self.split_group.append(cur_group)
+                self.split_group.append(['-', w])
+                cur_group = []
+            else:
+                if not cur_group:
+                    cur_group = ['n', '']
+                cur_group[1] += w
+        if cur_group:
+            self.split_group.append(cur_group)
+        self.noun_group = [w for (c, w) in self.split_group if c == 'n']
+
+    def _add_extra_noun(self):
+        if re.match(r'.+的.+', self.noun_group[-1]):
+            add_noun = re.match(r'.+(的.+)', self.noun_group[-1]).group(1)
+            for i in range(len(self.noun_group) - 1):
+                self.noun_group[i] += add_noun
 
