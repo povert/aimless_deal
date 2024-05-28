@@ -38,6 +38,7 @@ class SimplifyModel:
         format_rule1 = ['n', ]
         format_rule2 = ['v-n', 'vn-n', 'n-n', 'vn']
         format_rule3 = ['n-n-n', ]
+        format_rule4 = ['nv']
         if format_noun in format_rule1:
             self.simplify_noun = self.noun
         elif format_noun in format_rule2:
@@ -45,6 +46,8 @@ class SimplifyModel:
         elif format_noun in format_rule3:
             word1, word2 = self.noun_group[2][1], self.noun_group[-1][1]
             self.simplify_noun = word1 + word2
+        elif format_noun in format_rule4:
+            self.simplify_noun = self.noun_group[0][1]
 
     def _rm_extra_noun(self):
         if re.match(r'.+列表.+', self.simplify_noun):
@@ -54,12 +57,13 @@ class SimplifyModel:
 class AnalyzeModel:
     def __init__(self, noun):
         self.noun = noun
-        self.analyze_noun = []
         self._psg_list = list(psg.cut(noun))
         self.analyze()
 
     def analyze(self):
         self._split_noun()
+        if len(self.noun_group) == 1 and re.search(r'和|与|、', self.noun):
+            self._split_noun2()
         self._add_extra_noun()
 
     def _split_noun(self):
@@ -79,6 +83,20 @@ class AnalyzeModel:
         if cur_group:
             self.split_group.append(cur_group)
         self.noun_group = [w for (c, w) in self.split_group if c == 'n']
+
+    def _split_noun2(self):
+        split_group = re.split(r'和|与|、', self.noun)
+        self.noun_group = []
+        index = 0
+        for split_noun in split_group:
+            index += 1
+            deal_noun = ""
+            for (w, c) in psg.cut(split_noun):
+                if not deal_noun and not c in {'n', 'eng', 'vn', 'v'} and index == 1:
+                    continue
+                deal_noun += w
+            if deal_noun:
+                self.noun_group.append(deal_noun)
 
     def _add_extra_noun(self):
         if re.match(r'.+的.+', self.noun_group[-1]):
