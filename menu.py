@@ -12,7 +12,6 @@ class CMenu(object):
         self.model = None
         self.df = pandas.read_csv("./aaa.csv", header=None, names=["Question", "Ansewr"])
 
-
         master.geometry("400x800")
         master.title("SFT模型格式化输出")
 
@@ -29,7 +28,9 @@ class CMenu(object):
         model_label = tk.Label(model_frame, text="语料模型:")
         model_label.pack(side=tk.LEFT)
         self.model_combobox = ttk.Combobox(model_frame, textvariable=var)
-        self.model_combobox ['values'] = get_all_model()
+        self.model_list = get_all_model()
+        self.model_combobox ['values'] = self.model_list
+        self.model_combobox.bind('<KeyRelease>', self.autocomplete)
         self.model_combobox.pack(side=tk.LEFT, padx=(10, 0))
 
         button_frame = tk.Frame(master)
@@ -134,6 +135,15 @@ class CMenu(object):
         self.df.loc[len(self.df)] = self.model.out_put()
         self.df.to_csv("./aaa.csv", index=False, header=False)
         messagebox.showinfo("添加数据成功", "添加数据成功")
+
+    def autocomplete(self, event):
+        input_str = event.widget.get()
+        model_list = [s for s in self.model_list if s.startswith(input_str)]
+        if model_list:
+            self.model_combobox['values'] = model_list
+        else:
+            self.model_combobox['values'] = self.model_list
+
 
 current_file_path = os.path.abspath(__file__)
 current_dir_path = os.path.dirname(current_file_path)
