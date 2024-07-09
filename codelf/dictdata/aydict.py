@@ -7,32 +7,33 @@ current_file_path = os.path.abspath(__file__)
 current_dir_path = os.path.dirname(current_file_path)
 dict_file_name = f'{current_dir_path}/简明英汉词典（vivo_edited）.csv'
 result_list = []
+
 with open(dict_file_name, 'r', encoding='utf-8') as f:
     for line in f.readlines():
-        matches = re.findall(r'(\b[a-z]+\b(?:,\w+)?)\s*,\s*"([^"]+)"', line)
-        split_line = matches[0] if matches else line.split(',')
-        if len(split_line) != 2:
-            break
-        eng_word, eng_desc = split_line
+        line = line.strip()
+        matches = re.search('([a-zA-Z]+),"?([^"]*)"?', line)
+        if not matches:
+            continue
+        eng_word, eng_desc = matches.group(1), matches.group(2)
         if len(eng_word) <= 2:       # 小于两个字母的单词不考虑作为变量名处理
             continue
-        matches = re.findall(r'(vt\.|vi\.|n\.|adv\.|adj\.|prep\.|)(.*)', eng_desc)
-        for part_of_speech, content in matches:
-            content = re.sub(r'\[[^\]]*\]|\([^)]*\)|<[^>]*>', '', content).strip()
-            for chinese_word in re.split(r' |,|\.', content):
-                if not chinese_word:
+        chi_list = re.split(r'(vt\.|vi\.|n\.|adv\.|adj\.|prep\.|int\.|v\.|num\.)', eng_desc)[1:]
+        for i in range(0, len(chi_list), 2):
+            w_type = chi_list[i][:-1]
+            if w_type == 'num':
+                continue
+            chi_words = chi_list[i+1]
+            for chi_word in chi_words.split(','):
+                chi_word = re.sub(r'\[[^\]]*\]|\([^)]*\)|<[^>]*>', '', chi_word).strip()
+                if not chi_word:
                     continue
-                if re.search(r'[^\u4e00-\u9fa5]', chinese_word):
+                if re.search(r'[^\u4e00-\u9fa5]', chi_word):
                     continue
-                result_list.append(f'{chinese_word},{eng_word},{part_of_speech[:-1]}\n')
+                result_list.append(f'{chi_word},{eng_word},{w_type}\n')
 
 with open(f'{current_dir_path}/aydict.dat', 'w', encoding='utf-8') as f:
     f.writelines(result_list)
 print(f"解析完毕，共收集{len(result_list)}行数据")
-
-
-
-
 
 
 

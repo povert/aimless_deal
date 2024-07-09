@@ -75,7 +75,6 @@ class Translater:
         if has_recod:
             print(f"存在无法翻译字段，记录在{file_name}, 可手动处理")
 
-trans = Translater()
 
 
 
