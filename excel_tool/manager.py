@@ -15,7 +15,7 @@ class Manager(object):
         self.component = None
         self.config_component = {
             "select" : "excel_tool.select.SelectFileComponent",
-            "home" : "excel_tool.home.HomeComponent"
+            "replace" : "excel_tool.replace.ReplaceComponent"
         }
 
     def init_window(self):
@@ -40,9 +40,10 @@ class Manager(object):
         if self.state == STATE_LOAD_FILE and component == self.component:
             self.component.hide()
             workspace = self.component.work_space
-            self.component = self.load_component("home")
+            self.component = self.load_component("replace")
             self.component.set_workspace(workspace)
             self.state = STATE_SHOW_HOME
+            self.component.show(self.window, self.next_step)
         elif self.state == STATE_SHOW_HOME and component == self.component:
             self.component.hide()
             self.state = STATE_LOAD_FILE
@@ -51,10 +52,10 @@ class Manager(object):
 
     def run(self):
         self.state = STATE_LOAD_FILE
-        # self.component = self.load_component("select")
-        self.component = self.load_component("home")
-        work_space = openpyxl.open('/home/flyer/文档/povert/pandas_study/datas/student_excel/student_excel_clean.xlsx')
-        self.component.set_workspace(work_space)
+        self.component = self.load_component("select")
+        # self.component = self.load_component("replace")
+        # work_space = openpyxl.open('/home/flyer/文档/povert/pandas_study/datas/student_excel/student_excel_clean.xlsx')
+        # self.component.set_workspace(work_space)
         self.component.show(self.window, self.next_step)
         self.window.mainloop()
 
