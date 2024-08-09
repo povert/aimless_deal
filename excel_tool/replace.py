@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 import pandas
+import difflib
 import tkinter as tk
 from tkinter import ttk
 from tkinter import font
@@ -16,7 +17,7 @@ HEPL_TIP = '''1.请正确配置相应参数
 2.支持正则筛序和替换
 3.筛选字符为空则代表不筛选'''
 
-ROW_MAX = 100       # 最大显示行数（对界面显示速度影响较大）
+ROW_MAX = 100       # 默认最大显示行数（如果数据量过大，GUI会卡顿还会刷不出来）
 
 
 class ReplaceComponent(object):
@@ -84,8 +85,13 @@ class ReplaceComponent(object):
         self.replace_button = tk.Button(self.config_frame, text="替换", command=self.start_replace)
         self.replace_button.grid(row=0, column=7, sticky=tk.EW, padx=5, pady=5)
 
-        for i in range(8):
-            if i in (1, 2, 5, 7):     #1，2，5, 7组件宽度固定
+        self.row_max_label = tk.Label(self.config_frame, width=6, text="显示行数:")
+        self.row_max_label.grid(row=0, column=8, sticky=tk.EW, padx=(5, 0), pady=5)
+        self.row_max_wight = tk.Entry(self.config_frame, width=5)
+        self.row_max_wight.grid(row=0, column=9, sticky=tk.EW, padx=5, pady=5)
+        self.row_max_wight.insert(0, str(ROW_MAX))
+        for i in range(9):
+            if i in (1, 2, 5, 7, 8):     #1，2，5, 7组件宽度固定
                 continue
             self.config_frame.columnconfigure(i, weight=1)
 
@@ -160,8 +166,10 @@ class ReplaceComponent(object):
         else:
             self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(regx, cell.value)]
         sumcount = len(self.show_cell_list) - 1  # 排除第一列，第一列为列名
+        row_config = self.row_max_wight.get()
+        self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
         self.page = 1
-        self.total_page = sumcount // ROW_MAX if sumcount % ROW_MAX == 0 else sumcount // ROW_MAX + 1
+        self.total_page = sumcount // self.page_count if sumcount % self.page_count == 0 else sumcount // self.page_count + 1
         self.init_bottom_show()
         self.show_page(1)
 
@@ -173,13 +181,39 @@ class ReplaceComponent(object):
         if not re.search('^[A-Z]+$', self.col_name_label.get()):
             messagebox.showinfo("提示","请输入正确的列名")
             return False
-        if not self.repl_label.get():
-            messagebox.showinfo("提示","请输入替换内容")
-            return False
         return True
 
     def fouse_text(self):
-        pass
+        fouse_index = self.fouse_label.get()
+        if not fouse_index.isdigit():
+            messagebox.showinfo("提示","请输入正确的序号")
+            return
+        fouse_index = int(fouse_index)
+        if fouse_index < 1 or fouse_index > len(self.show_cell_list):
+            messagebox.showinfo("提示","输入的序列号超出显示范围")
+            return
+        show_page = self.page
+        for i in range(self.total_page):
+            if (i + 1) * self.page_count >= fouse_index:
+                show_page = i + 1
+                break
+        if self.page != show_page:
+            self.show_page(show_page)
+        index = fouse_index - self.page_count * (self.page - 1)
+        diff_obj = self.diff_obj_list[index - 1]
+        if not diff_obj.state:
+            messagebox.showinfo("警告", "定位差异行居然没有设置显示，计算存在问题")
+            return
+        end_diff_obj = self.diff_obj_list[-1]
+        if self.page == self.total_page:
+            for i in range(len(self.diff_obj_list) - 1, -1, -1):
+                if self.diff_obj_list[i].state:
+                    end_diff_obj = self.diff_obj_list[i]
+                    break
+        height = end_diff_obj.text2.winfo_rooty() - self.diff_obj_list[0].text2.winfo_rooty()
+        look_at = diff_obj.text2.winfo_rooty() - self.diff_obj_list[0].text2.winfo_rooty() - 10     # 10是预留的高度
+        self.scrollable_canvas.yview_moveto(look_at / height)
+        diff_obj.text2.focus_set()
 
     def show_diff(self):
         pass
@@ -205,16 +239,19 @@ class ReplaceComponent(object):
         if self.page == self.total_page:
             self.next_page_button.config(state=tk.NORMAL)
         self.page = page
-        start_index = (page - 1) * ROW_MAX
+        start_index = (page - 1) * self.page_count
         repr = self.repl_label.get()
         replace = self.replace_label.get()
         col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
-        for i in range(start_index, start_index + ROW_MAX):
+        for i in range(start_index, start_index + self.page_count):
             if i < len(self.show_cell_list):
                 index = self.show_cell_list[i]
                 s1 = str(col_work[index].value)
                 if not index in self.replace_series:
-                    self.replace_series[index] = re.sub(repr, replace, s1)
+                    if repr:
+                        self.replace_series[index] = re.sub(repr, replace, s1)
+                    else:
+                        self.replace_series[index] = s1
                 s2 = self.replace_series[index]
                 if i - start_index == len(self.diff_obj_list):
                     self.diff_obj_list.append(CDiffRow(self.inner_frame, i - start_index))
@@ -227,6 +264,7 @@ class ReplaceComponent(object):
             self.last_page_button.config(state=tk.DISABLED)
         if self.page == self.total_page:
             self.next_page_button.config(state=tk.DISABLED)
+        self.page_text.set(f'{self.page}/{self.total_page}')
 
     def save_replace(self):
         pass
@@ -253,7 +291,6 @@ class ReplaceComponent(object):
         self.diff_frame = None
 
 
-
 class CDiffRow(object):
     def __init__(self, frame, row):
         self.index = 0
@@ -263,20 +300,61 @@ class CDiffRow(object):
         self.lable = tk.Label(frame, textvariable=self.label_text, width=5, relief=tk.RIDGE)
         self.text1 = tk.Text(frame, height=1, state=tk.DISABLED)
         self.text2 = tk.Text(frame, height=1)
+        self.text1.tag_configure("red", foreground='red')
+        self.text2.tag_configure("red", foreground='red')
 
     def set_row(self, i, s1, s2):
         self.index = i
         self.label_text.set(str(i))
         self.text1.config(state=tk.NORMAL)
         self.text1.delete('1.0', tk.END)
-        self.text1.insert(tk.END, s1)
-        height1 = len(re.findall('\n', s1)) + 1
-        self.text1.config(height=height1)
-        self.text1.config(state=tk.DISABLED)
         self.text2.delete('1.0', tk.END)
-        self.text2.insert(tk.END, s2)
-        height2 = len(re.findall('\n', s2)) + 1
+        height1 = 0
+        height2 = 0
+
+        # 对比出差异文本，然后在显示
+        seqm = difflib.SequenceMatcher(None, list(s1), list(s2))
+        index_s1 = 0
+        index_s2 = 0
+        for tag, i1, i2, j1, j2 in seqm.get_opcodes():
+            if tag == 'replace':
+                self.text1.insert(tk.END, s1[index_s1:i2], "red")
+                self.text2.insert(tk.END, s2[index_s2:j2], "red")
+                l1 = re.findall(r'\n', s1[index_s1:i2])
+                l2 = re.findall(r'\n', s2[index_s2:j2])
+                index_s1 = i2
+                index_s2 = j2
+            elif tag == 'delete':
+                # 删除的字符用红色表示
+                self.text1.insert(tk.END, s1[index_s1:i2], "red")
+                l1 = re.findall(r'\n', s1[index_s1:i2])
+                l2 = []
+                index_s1 = i2
+            elif tag == 'insert':
+                # 插入的字符用红色表示
+                self.text2.insert(tk.END, s2[index_s2:j2], "red")
+                l1 = []
+                l2 = re.findall(r'\n', s2[index_s2:j2])
+                index_s2 = j2
+            elif tag == 'equal':
+                # 相同的字符保持原色
+                self.text1.insert(tk.END, s1[index_s1:i2])
+                self.text2.insert(tk.END, s2[index_s2:j2])
+                l1 = re.findall(r'\n', s1[index_s1:i2])
+                l2 = re.findall(r'\n', s2[index_s2:j2])
+                index_s1 = i2
+                index_s2 = j2
+            height1 += len(l1)
+            height2 += len(l2)
+            if len(l1) > len(l2):
+                self.text2.insert(tk.END, "\n>>>" * (len(l1) - len(l2)))
+            elif len(l2) > len(l1):
+                self.text1.insert(tk.END, "\n>>>" * (len(l2) - len(l1)))
+
+        # 配置高度和其他
+        self.text1.config(height=height1)
         self.text2.config(height=height2)
+        self.text1.config(state=tk.DISABLED)
 
     def show(self):
         if self.state:

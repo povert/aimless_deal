@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 import importlib
-import openpyxl
+import os
 
 STATE_NONE = 0
 STATE_LOAD_FILE = 1
@@ -40,6 +40,8 @@ class Manager(object):
         if self.state == STATE_LOAD_FILE and component == self.component:
             self.component.hide()
             workspace = self.component.work_space
+            file_name = os.path.basename(self.component.filename.get())
+            self.window.title(file_name)
             self.component = self.load_component("replace")
             self.component.set_workspace(workspace)
             self.state = STATE_SHOW_HOME
