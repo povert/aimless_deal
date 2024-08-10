@@ -155,24 +155,17 @@ class ReplaceComponent(object):
                 self.inner_frame.columnconfigure(col, weight=0)
             else:
                 self.inner_frame.columnconfigure(col, weight=1)
-        sheet_name = self.sheet_name_label.get()
-        col_name = self.col_name_label.get()
-        regx = self.regx_filter_label.get()
-        col_work = self.workspace[sheet_name][col_name]
+        self.show_cell_list = []
         self.diff_obj_list = []
-        self.replace_series = pandas.Series()      # 使用pandas.Series存储替换结果
-        if regx == "":
-            self.show_cell_list = list(range(1, len(col_work)))
-        else:
-            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(regx, cell.value)]
-        sumcount = len(self.show_cell_list) - 1  # 排除第一列，第一列为列名
-        row_config = self.row_max_wight.get()
-        self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
+        self.replace_series = pandas.Series()  # 使用pandas.Series存储替换结果
         self.page = 1
-        self.total_page = sumcount // self.page_count if sumcount % self.page_count == 0 else sumcount // self.page_count + 1
+        self.page_count = 1
+        self.total_page = 1
         self.init_bottom_show()
-        self.show_page(1)
-
+        if self.repl_label.get():
+            self.show_diff()
+        else:
+            self.show_all()
 
     def valid_replace(self):
         if self.sheet_name_label.get() not in self.workspace:
@@ -216,16 +209,80 @@ class ReplaceComponent(object):
         diff_obj.text2.focus_set()
 
     def show_diff(self):
-        pass
+        if not self.repl_label.get():
+            self.page = 1
+            self.total_page = 1
+            self.show_cell_list = []
+            self.show_page(1)
+            self.all_button.config(state=tk.NORMAL)
+            self.diff_button.config(state=tk.DISABLED)
+            self.nodiff_button.config(state=tk.NORMAL)
+            return
+        repl = self.repl_label.get()
+        regx = self.regx_filter_label.get()
+        col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
+        if regx:
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(regx, str(cell.value)) and re.search(repl, str(cell.value))]
+        else:
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(repl, str(cell.value))]
+        sumcount = len(self.show_cell_list)
+        row_config = self.row_max_wight.get()
+        self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
+        self.page = 1
+        self.total_page = sumcount // self.page_count if sumcount % self.page_count == 0 else sumcount // self.page_count + 1
+        self.show_page(1)
+        self.all_button.config(state=tk.NORMAL)
+        self.diff_button.config(state=tk.DISABLED)
+        self.nodiff_button.config(state=tk.NORMAL)
 
     def show_nodiff(self):
-        pass
+        if not self.repl_label.get():
+            self.show_all()
+            self.all_button.config(state=tk.NORMAL)
+            self.diff_button.config(state=tk.NORMAL)
+            self.nodiff_button.config(state=tk.DISABLED)
+            return
+        repl = self.repl_label.get()
+        regx = self.regx_filter_label.get()
+        col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
+        if regx:
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and re.search(regx, str(cell.value)) and not re.search(repl, str(cell.value))]
+        else:
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and not re.search(repl, str(cell.value))]
+        sumcount = len(self.show_cell_list)
+        row_config = self.row_max_wight.get()
+        self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
+        self.page = 1
+        self.total_page = sumcount // self.page_count if sumcount % self.page_count == 0 else sumcount // self.page_count + 1
+        self.show_page(1)
+        self.all_button.config(state=tk.NORMAL)
+        self.diff_button.config(state=tk.NORMAL)
+        self.nodiff_button.config(state=tk.DISABLED)
 
     def show_all(self):
-        pass
+        regx = self.regx_filter_label.get()
+        col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
+        if regx:
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and re.search(regx, str(cell.value))]
+        else:
+            self.show_cell_list = list(range(1, len(col_work)))
+        sumcount = len(self.show_cell_list)
+        row_config = self.row_max_wight.get()
+        self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
+        self.page = 1
+        self.total_page = sumcount // self.page_count if sumcount % self.page_count == 0 else sumcount // self.page_count + 1
+        self.show_page(1)
+        self.all_button.config(state=tk.DISABLED)
+        self.diff_button.config(state=tk.NORMAL)
+        self.nodiff_button.config(state=tk.NORMAL)
 
     def shaixuan(self):
-        pass
+        if self.nodiff_button.cget('state') == tk.DISABLED:
+            self.show_nodiff()
+        elif self.diff_button.cget('state') == tk.DISABLED:
+            self.show_diff()
+        else:
+            self.show_all()
 
     def last_page(self):
         self.show_page(self.page - 1)
