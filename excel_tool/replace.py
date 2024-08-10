@@ -182,18 +182,15 @@ class ReplaceComponent(object):
             messagebox.showinfo("提示","请输入正确的序号")
             return
         fouse_index = int(fouse_index)
-        if fouse_index < 1 or fouse_index > len(self.show_cell_list):
-            messagebox.showinfo("提示","输入的序列号超出显示范围")
+        if fouse_index not in self.show_cell_list:
+            messagebox.showinfo("提示","输入的序列号不在显示范围内，请调整筛选条件")
             return
-        show_page = self.page
-        for i in range(self.total_page):
-            if (i + 1) * self.page_count >= fouse_index:
-                show_page = i + 1
-                break
+        index = self.show_cell_list.index(fouse_index)
+        show_page = index // self.page_count + 1
         if self.page != show_page:
             self.show_page(show_page)
-        index = fouse_index - self.page_count * (self.page - 1)
-        diff_obj = self.diff_obj_list[index - 1]
+        index = index % self.page_count
+        diff_obj = self.diff_obj_list[index]
         if not diff_obj.state:
             messagebox.showinfo("警告", "定位差异行居然没有设置显示，计算存在问题")
             return
@@ -204,7 +201,7 @@ class ReplaceComponent(object):
                     end_diff_obj = self.diff_obj_list[i]
                     break
         height = end_diff_obj.text2.winfo_rooty() - self.diff_obj_list[0].text2.winfo_rooty()
-        look_at = diff_obj.text2.winfo_rooty() - self.diff_obj_list[0].text2.winfo_rooty() - 10     # 10是预留的高度
+        look_at = diff_obj.text2.winfo_rooty() - self.diff_obj_list[0].text2.winfo_rooty() - 20     # 20是预留的高度
         self.scrollable_canvas.yview_moveto(look_at / height)
         diff_obj.text2.focus_set()
 
