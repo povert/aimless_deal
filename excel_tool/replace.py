@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+import os
 import pandas
 import difflib
 import tkinter as tk
@@ -33,11 +34,13 @@ class ReplaceComponent(object):
 
     def col(self, S):
         return ord(S) - ord('A')
-    def set_workspace(self, workspace):
+    def set_workspace(self, workspace, file_name):
         self.workspace = workspace
+        self.file_name = file_name
 
     def show(self, window, next_step):
         self.next_step = next_step
+        window.title(os.path.basename(self.file_name))
         self.frame = tk.Frame(window)
         self.init_config_show()
         custom_font = font.Font(family='Arial', size=32)
@@ -206,22 +209,13 @@ class ReplaceComponent(object):
         diff_obj.text2.focus_set()
 
     def show_diff(self):
-        if not self.repl_label.get():
-            self.page = 1
-            self.total_page = 1
-            self.show_cell_list = []
-            self.show_page(1)
-            self.all_button.config(state=tk.NORMAL)
-            self.diff_button.config(state=tk.DISABLED)
-            self.nodiff_button.config(state=tk.NORMAL)
-            return
         repl = self.repl_label.get()
         regx = self.regx_filter_label.get()
         col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
         if regx:
-            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(regx, str(cell.value)) and re.search(repl, str(cell.value))]
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(regx, str(cell.value)) and self.is_show_diff(i, cell, repl)]
         else:
-            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and re.search(repl, str(cell.value))]
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i!= 0 and self.is_show_diff(i, cell, repl)]
         sumcount = len(self.show_cell_list)
         row_config = self.row_max_wight.get()
         self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
@@ -232,20 +226,21 @@ class ReplaceComponent(object):
         self.diff_button.config(state=tk.DISABLED)
         self.nodiff_button.config(state=tk.NORMAL)
 
+    def is_show_diff(self, index, cell, repl):
+        if index in self.replace_series:
+            return self.replace_series[index] != str(cell.value)
+        if not repl:
+            return False
+        return re.search(repl, str(cell.value))
+
     def show_nodiff(self):
-        if not self.repl_label.get():
-            self.show_all()
-            self.all_button.config(state=tk.NORMAL)
-            self.diff_button.config(state=tk.NORMAL)
-            self.nodiff_button.config(state=tk.DISABLED)
-            return
         repl = self.repl_label.get()
         regx = self.regx_filter_label.get()
         col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
         if regx:
-            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and re.search(regx, str(cell.value)) and not re.search(repl, str(cell.value))]
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and re.search(regx, str(cell.value)) and not self.is_show_diff(i, cell, repl)]
         else:
-            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and not re.search(repl, str(cell.value))]
+            self.show_cell_list = [i for i, cell in enumerate(col_work) if i != 0 and not self.is_show_diff(i, cell, repl)]
         sumcount = len(self.show_cell_list)
         row_config = self.row_max_wight.get()
         self.page_count = int(row_config) if row_config.isdigit() else ROW_MAX
@@ -308,7 +303,7 @@ class ReplaceComponent(object):
                         self.replace_series[index] = s1
                 s2 = self.replace_series[index]
                 if i - start_index == len(self.diff_obj_list):
-                    self.diff_obj_list.append(CDiffRow(self.inner_frame, i - start_index))
+                    self.diff_obj_list.append(CDiffRow(self, self.inner_frame, i - start_index))
                 self.diff_obj_list[i - start_index].set_row(index, s1, s2)
                 self.diff_obj_list[i - start_index].show()
             else:
@@ -321,7 +316,17 @@ class ReplaceComponent(object):
         self.page_text.set(f'{self.page}/{self.total_page}')
 
     def save_replace(self):
-        pass
+        col_work = self.workspace[self.sheet_name_label.get()][self.col_name_label.get()]
+        repr = self.repl_label.get()
+        replace = self.replace_label.get()
+        for index in range(1, len(col_work)):
+            if index in self.replace_series:
+                col_work[index].value = self.replace_series[index]
+            else:
+                s = str(col_work[index].value)
+                col_work[index].value = re.sub(repr, replace, s)
+        self.show_page(self.page)
+        self.workspace.save(self.file_name)
 
     def on_resize(self, event):
         if self.scrollable_canvas and not self.inner_frame_update:
@@ -338,33 +343,42 @@ class ReplaceComponent(object):
     def release_diff_frame(self):
         if not self.diff_frame:
             return
+        for diff_obj in self.diff_obj_list:
+            diff_obj.release()
+        self.diff_obj_list = []
+        self.replace_series = None
         self.diff_frame.pack_forget()
         for widget in self.diff_frame.winfo_children():
             widget.destroy()
         self.diff_frame.destroy()
         self.diff_frame = None
 
-
 class CDiffRow(object):
-    def __init__(self, frame, row):
+    def __init__(self, compont, frame, row):
         self.index = 0
         self.state = False
         self.row = row
+        self.change = False
+        self.compont = compont
         self.label_text = tk.StringVar()
         self.lable = tk.Label(frame, textvariable=self.label_text, width=5, relief=tk.RIDGE)
         self.text1 = tk.Text(frame, height=1, state=tk.DISABLED)
         self.text2 = tk.Text(frame, height=1)
         self.text1.tag_configure("red", foreground='red')
         self.text2.tag_configure("red", foreground='red')
+        self.text1.tag_configure("grey", foreground='grey')
+        self.text2.tag_configure("grey", foreground='grey')
+        self.text2.bind('<KeyRelease>', self.on_text_modified)
+        self.text2.bind('<FocusOut>', self.on_focus_out)
 
     def set_row(self, i, s1, s2):
         self.index = i
+        self.change = False
         self.label_text.set(str(i))
         self.text1.config(state=tk.NORMAL)
         self.text1.delete('1.0', tk.END)
         self.text2.delete('1.0', tk.END)
-        height1 = 0
-        height2 = 0
+        height = 1
 
         # 对比出差异文本，然后在显示
         seqm = difflib.SequenceMatcher(None, list(s1), list(s2))
@@ -398,17 +412,27 @@ class CDiffRow(object):
                 l2 = re.findall(r'\n', s2[index_s2:j2])
                 index_s1 = i2
                 index_s2 = j2
-            height1 += len(l1)
-            height2 += len(l2)
+            height += max(len(l1), len(l2))
             if len(l1) > len(l2):
-                self.text2.insert(tk.END, "\n>>>" * (len(l1) - len(l2)))
+                self.text2.insert(tk.END, "\n>>>" * (len(l1) - len(l2)), "grey")
             elif len(l2) > len(l1):
-                self.text1.insert(tk.END, "\n>>>" * (len(l2) - len(l1)))
+                self.text1.insert(tk.END, "\n>>>" * (len(l2) - len(l1)), "grey")
 
         # 配置高度和其他
-        self.text1.config(height=height1)
-        self.text2.config(height=height2)
+        self.text1.config(height=height)
+        self.text2.config(height=height)
         self.text1.config(state=tk.DISABLED)
+
+    def on_text_modified(self, event):
+        current_text = event.widget.get("1.0", "end-1c")
+        self.compont.replace_series[self.index] = current_text.replace("\n>>>", "")
+        self.change = True
+
+    def on_focus_out(self, event):
+        if self.change:
+            s1 =self.compont.workspace[self.compont.sheet_name_label.get()][self.compont.col_name_label.get()][self.index].value
+            s2 =self.compont.replace_series[self.index]
+            self.set_row(self.index, s1, s2)
 
     def show(self):
         if self.state:
@@ -425,3 +449,10 @@ class CDiffRow(object):
         self.lable.grid_forget()
         self.text1.grid_forget()
         self.text2.grid_forget()
+
+    def release(self):
+        self.compont = None
+        self.text1 = None
+        self.text2 = None
+        self.lable = None
+

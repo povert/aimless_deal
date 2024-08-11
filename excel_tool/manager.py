@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 import importlib
-import os
 
 STATE_NONE = 0
 STATE_LOAD_FILE = 1
@@ -40,10 +39,9 @@ class Manager(object):
         if self.state == STATE_LOAD_FILE and component == self.component:
             self.component.hide()
             workspace = self.component.work_space
-            file_name = os.path.basename(self.component.filename.get())
-            self.window.title(file_name)
+            file_name = self.component.filename.get()
             self.component = self.load_component("replace")
-            self.component.set_workspace(workspace)
+            self.component.set_workspace(workspace, file_name)
             self.state = STATE_SHOW_HOME
             self.component.show(self.window, self.next_step)
         elif self.state == STATE_SHOW_HOME and component == self.component:
@@ -55,9 +53,13 @@ class Manager(object):
     def run(self):
         self.state = STATE_LOAD_FILE
         self.component = self.load_component("select")
+        import openpyxl
         # self.component = self.load_component("replace")
-        # work_space = openpyxl.open('/home/flyer/文档/povert/pandas_study/datas/student_excel/student_excel_clean.xlsx')
-        # self.component.set_workspace(work_space)
+        # file = '/home/flyer/文档/povert/aimless_deal/codelf/dictdata/简明英汉词典（vivo_edited）.xlsx'
+        # file = '/home/flyer/文档/povert/pandas_study/deal.xlsx'
+        # work_space = openpyxl.open(file)
+        # work_space = openpyxl.open('/home/flyer/文档/povert/pandas_study/38. batch_chinese_english.xlsx')
+        # self.component.set_workspace(work_space, file)
         self.component.show(self.window, self.next_step)
         self.window.mainloop()
 
