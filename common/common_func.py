@@ -57,7 +57,7 @@ def find_full_path_by_parts(file_path: str, parts: List[str], max_depth: int = 7
     return None
 
 
-def get_file_path_groups(file_path: str, groups: List[Union[int, str]]) -> List[str, ...]:
+def get_file_path_groups(file_path: str, groups: List[Union[int, str]]) -> List[str]:
     file_path_list = [sep_path for sep_path in file_path.split('/')[:-1] if sep_path]
     result: List[str] = []
     for group in groups:
@@ -98,3 +98,15 @@ def write_jsonl_file(file_path: str, all_data: List[Union[dict, str]]) -> None:
         f.write('\n'.join(save_data))
 
 
+def find_optimal_split_val(y, m, n):
+    """返回区间[m,n]内使y分割最均匀的最大x值"""
+    if n >= y: return n
+    best_x = n
+    min_diff = float('inf')
+    for a in range(y // m, y // n - 1, -1):
+        x = max(m, min(n, y // a))
+        diff = y - a * x
+        print(x, a, diff)
+        if diff <= min_diff:
+            min_diff, best_x = diff, x
+    return best_x
