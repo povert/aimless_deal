@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-import json
 import re
-
 from typing import List, Union
 
 
@@ -63,50 +61,25 @@ def get_file_path_groups(file_path: str, groups: List[Union[int, str]]) -> List[
     for group in groups:
         if isinstance(group, int):
             result.append(file_path_list[group])
-            continue
-        if isinstance(group, str):
-            match_result = re.match(r'(\d+)-(\d+)', group)
-            if match_result:
-                group = range(int(match_result.group(1)), int(match_result.group(2)) + 1)
-        last_g = -1
-        s = ''
-        for g in group:
-            if g == 0:
-                s += f'/{file_path_list[g]}'
-            elif last_g != -1 and g - last_g == 1:
-                s += f'/{file_path_list[g]}'
-            elif last_g == -1:
-                s = file_path_list[g]
+        elif re.match(r'([-\d]+)~([-\d]+)', group):
+            start, end = map(int, group.split('~'))
+            if start < 0:
+                start = len(file_path_list) + start
+            if end < 0:
+                end = len(file_path_list) + end
+            if start > end:
+                start, end = end, start
+            if end - start == 1:
+                value = f'{file_path_list[start]}/{file_path_list[end]}'
             else:
-                s += f'/*/{file_path_list[g]}'
-            last_g = g
-        result.append(s)
+                value = f'{file_path_list[start]}/*/{file_path_list[end]}'
+            result.append(value)
     return result
 
 
-def write_jsonl_file(file_path: str, all_data: List[Union[dict, str]]) -> None:
-    save_data = []
-    for data in all_data:
-        if isinstance(data, str):
-            save_data.append(data)
-        else:
-            save_data.append(json.dumps(data, ensure_ascii=False))
-    save_dir = os.path.dirname(file_path)
-    if save_dir and not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    with open(file_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(save_data))
-
-
-def find_optimal_split_val(y, m, n):
-    """返回区间[m,n]内使y分割最均匀的最大x值"""
-    if n >= y: return n
-    best_x = n
-    min_diff = float('inf')
-    for a in range(y // m, y // n - 1, -1):
-        x = max(m, min(n, y // a))
-        diff = y - a * x
-        print(x, a, diff)
-        if diff <= min_diff:
-            min_diff, best_x = diff, x
-    return best_x
+def get_parent_basename(file_path: str, parent_level: int = 1):
+    parent_path = file_path
+    for i in range(parent_level):
+        parent_path = os.path.dirname(parent_path)
+    parent_basename = os.path.basename(parent_path)
+    return parent_basename
